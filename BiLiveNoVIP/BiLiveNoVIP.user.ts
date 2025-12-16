@@ -1519,9 +1519,10 @@ ruid=${ruid}&room_id=${room_id}&page=1&page_size=100&type=${type}&switch=${switc
       await this.userInfoDB.open([["uid", true], ["name", false]])
     }
     item?.forEach(userInfo => {
-      if (!userInfo.name.endsWith('***')) {
-        this.userInfoDB.putData({ crc32: Tools.crc32(userInfo.uid), uid: userInfo.uid, name: userInfo.name })
+      if ([...userInfo.name].length === 4 && userInfo.name.endsWith('***')) {
+        return
       }
+      this.userInfoDB.putData({ crc32: Tools.crc32(userInfo.uid), uid: userInfo.uid, name: userInfo.name })
     })
   }
 }
