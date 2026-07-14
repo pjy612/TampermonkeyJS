@@ -4,16 +4,16 @@
   "description": "一些自用的脚本，我用着舒服就行，不保证质量",
   "main": "index.js",
   "scripts": {
-    "build": "npm run build:tsc && npm run fmt",
-    "build:tsc": "tsc -p tsconfig.json || exit 0",
+    "build": "npm run build:tsgo && npm run fmt",
+    "build:tsgo": "tsgo -p tsconfig.json || exit 0",
     "fmt": "node fmt.js"
   },
   "author": "lzghzr",
   "license": "MIT",
   "devDependencies": {
-    "@types/crypto-js": "^4.2.2",
-    "crc-32": "^1.2.2",
-    "typescript": "5.8.3"
+    "@types/crypto-js": "4.2.2",
+    "crc-32": "1.2.2",
+    "typescript": "7.0.2"
   },
   "dependencies": {}
 }

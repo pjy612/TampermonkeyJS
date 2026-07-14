@@ -52,7 +52,7 @@
     // "noPropertyAccessFromIndexSignature": true,  /* Require undeclared properties from index signatures to use element accesses. */
 
     /* 模块分辨率选项 */
-    "moduleResolution": "node10",                   /* 指定模块解析策略: "node" (Node.js)或 "classic" (TypeScript pre-1.6)。 */
+    // "moduleResolution": "node10",                /* 指定模块解析策略: "node" (Node.js)或 "classic" (TypeScript pre-1.6)。 */
     // "baseUrl": "./",                             /* 用于解析非绝对模块名的基目录。 */
     // "paths": {},                                 /* 一系列条目，这些条目将重新映射导入内容，以查找与 "baseUrl" 有关的位置。 */
     // "rootDirs": [],                              /* 根文件夹列表，其组合内容表示在运行时的项目结构。 */
