@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                bilibili直播净化
 // @namespace           https://github.com/lzghzr/GreasemonkeyJS
-// @version             4.3.10
+// @version             4.3.11
 // @author              lzghzr
 // @description         增强直播屏蔽功能, 提高直播观看体验
 // @icon                data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTUiIHN0cm9rZT0iIzAwYWVlYyIgc3Ryb2tlLXdpZHRoPSIyIiBmaWxsPSJub25lIi8+PHRleHQgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBDSksgU0MiIGZvbnQtc2l6ZT0iMjIiIHg9IjUiIHk9IjIzIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMCIgZmlsbD0iIzAwYWVlYyI+5ruaPC90ZXh0Pjwvc3ZnPg==
@@ -33,42 +33,50 @@ class DB {
     this.keyPath = keyPath;
   }
   open(store) {
-    return new Promise((resolve, reject) => {
+    this.db ??= new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName);
       request.onerror = () => {
+        this.db = undefined;
         reject(request.error);
       };
       request.onsuccess = () => {
-        this.db = request.result;
         resolve(request.result);
       };
       request.onupgradeneeded = () => {
-        this.db = request.result;
-        if (!this.db.objectStoreNames.contains(this.objectStoreName)) {
-          const objectStore = this.db.createObjectStore(this.objectStoreName, { keyPath: this.keyPath });
-          store.forEach(vaule => {
-            objectStore.createIndex(vaule[0], vaule[0], { unique: vaule[1] });
+        const db = request.result;
+        if (!db.objectStoreNames.contains(this.objectStoreName)) {
+          const objectStore = db.createObjectStore(this.objectStoreName, { keyPath: this.keyPath });
+          store.forEach(value => {
+            objectStore.createIndex(value[0], value[0], { unique: value[1] });
           });
         }
       };
     });
+    return this.db;
   }
-  putData(data) {
+  async putData(list) {
+    if (!this.db)
+      throw new Error('db not opened');
+    if (list.length === 0)
+      return;
+    const db = await this.db;
     return new Promise((resolve, reject) => {
-      const store = this.db.transaction([this.objectStoreName], 'readwrite').objectStore(this.objectStoreName);
-      const request = store.put(data);
-      request.onerror = () => {
-        reject(request.error);
+      const store = db.transaction([this.objectStoreName], 'readwrite').objectStore(this.objectStoreName);
+      list.forEach(value => store.put(value));
+      store.transaction.onerror = () => {
+        reject(store.transaction.error);
       };
-      request.onsuccess = () => {
+      store.transaction.oncomplete = () => {
         resolve();
       };
     });
   }
-  getData(key) {
+  async getData(key) {
+    if (!this.db)
+      throw new Error('db not opened');
+    const db = await this.db;
     return new Promise((resolve, reject) => {
-      const store = this.db.transaction([this.objectStoreName], 'readonly').objectStore(this.objectStoreName);
-      const request = store.get(key);
+      const request = db.transaction([this.objectStoreName], 'readonly').objectStore(this.objectStoreName).get(key);
       request.onerror = () => {
         reject(request.error);
       };
@@ -614,15 +622,15 @@ $<mut_n>("text",{attrs:{"font-family":"Noto Sans CJK SC","font-size":"14",x:"5",
       mutations.forEach(mutation => {
         mutation.addedNodes.forEach(addedNode => {
           if (addedNode instanceof HTMLDivElement && addedNode.classList.contains('danmaku-item')) {
-            const nameNode = addedNode.querySelector('.danmaku-item-left');
             const chatNode = addedNode.querySelector('.danmaku-item-right');
-            if (chatNode !== null) {
-              if (nameNode !== null && nameNode.querySelector('.user-name') === null) {
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'user-name v-middle pointer open-menu';
-                nameSpan.innerText = addedNode.dataset['uname'] + " : " || '跨房用户';
-                nameNode.appendChild(nameSpan);
-              }
+            if (!chatNode)
+              return;
+            const nameNode = addedNode.querySelector('.danmaku-item-left');
+            if (nameNode !== null && nameNode.querySelector('.user-name') === null) {
+              const nameSpan = document.createElement('span');
+              nameSpan.className = 'user-name v-middle pointer open-menu';
+              nameSpan.innerText = addedNode.dataset['uname'] + " : " || '跨房用户';
+              nameNode.appendChild(nameSpan);
             }
             const chatText = chatNode.innerText;
             const dateNow = Date.now();
@@ -1282,7 +1290,11 @@ body:not(.player-full-win):has(iframe[src*="live-lottery"])[style*="overflow: hi
   height: calc(100% - 135px) !important;
 }`);
   }
+  getRankTask = false;
   async getRank(room_id, ruid) {
+    if (this.getRankTask)
+      return;
+    this.getRankTask = true;
     const queryContributionRank = await fetch(this.queryRank(room_id, ruid, 'online_rank', 'contribution_rank'));
     const rank = await queryContributionRank.json();
     if (this.rankInvisible && rank?.data?.count > 150) {
@@ -1311,16 +1323,16 @@ ruid=${ruid}&room_id=${room_id}&page=1&page_size=100&type=${type}&switch=${switc
     return Tools.querySign(url);
   }
   async addUserInfo(item) {
-    if (this.userInfoDB === undefined) {
-      this.userInfoDB = new DB('blnvUserInfo', 'userInfo', 'crc32');
-      await this.userInfoDB.open([["uid", true], ["name", false]]);
-    }
+    this.userInfoDB ??= new DB('blnvUserInfo', 'userInfo', 'crc32');
+    await this.userInfoDB.open([["uid", true], ["name", false]]);
+    const pending = [];
     item?.forEach(userInfo => {
       if ([...userInfo.name].length === 4 && userInfo.name.endsWith('***')) {
         return;
       }
-      this.userInfoDB.putData({ crc32: Tools.crc32(userInfo.uid), uid: userInfo.uid, name: userInfo.name });
+      pending.push({ crc32: Tools.crc32(userInfo.uid), uid: userInfo.uid, name: userInfo.name });
     });
+    await this.userInfoDB.putData(pending);
   }
 }
 const noVIP = new NoVIP();
